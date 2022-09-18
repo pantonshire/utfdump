@@ -1,5 +1,6 @@
 use std::{fmt, io::{self, Read}};
 
+use clap::Parser;
 use libshire::strings::CappedString;
 use tabled::{Tabled, Table, Style};
 
@@ -7,7 +8,16 @@ use utfdump_core::{chardata::Category, encoded::Data};
 
 const UNICODE_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/unicode_data_encoded"));
 
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    #[clap(short, long, action)]
+    full_category_names: bool,
+}
+
 fn main() {
+    let args = Args::parse();
+
     let data = Data::<'static>::from_bytes(UNICODE_DATA).unwrap();
 
     let input = {
@@ -32,7 +42,10 @@ fn main() {
 
             if let Some(char_data) = data.get(c as u32) {
                 name = Optional::Some(char_data.name());
-                category = Optional::Some(char_data.category());
+                category = Optional::Some(DisplayCategory {
+                    category: char_data.category(),
+                    full_name: args.full_category_names,
+                });
 
                 let ccc = char_data.ccc();
                 char_combining_class = Optional::Some(ccc);
@@ -68,14 +81,14 @@ fn main() {
 struct OutRow {
     #[tabled(rename = "")]
     display_char: CappedString<8>, 
-    #[tabled(rename = "Codepoint")]
+    #[tabled(rename = "Code")]
     codepoint: Codepoint,
     #[tabled(rename = "UTF-8")]
     utf_8_bytes: Utf8Bytes,
     #[tabled(rename = "Name")]
     name: Optional<&'static str>,
     #[tabled(rename = "Category")]
-    category: Optional<Category>,
+    category: Optional<DisplayCategory>,
     #[tabled(rename = "Combining")]
     char_combining_class: Optional<u8>,
 }
@@ -124,3 +137,20 @@ impl fmt::Display for Utf8Bytes {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+struct DisplayCategory {
+    category: Category,
+    full_name: bool,
+}
+
+impl fmt::Display for DisplayCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.full_name {
+            write!(f, "{}", self.category.full_name())
+        } else {
+            write!(f, "{}", self.category.abbr())
+        }
+    }
+}
+

@@ -231,7 +231,7 @@ impl Category {
 
 impl fmt::Display for Category {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.abbr(), self.full_name())
+        write!(f, "{}", self.abbr())
     }
 }
 

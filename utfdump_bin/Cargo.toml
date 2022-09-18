@@ -7,6 +7,7 @@ edition = "2021"
 utfdump_core = { path = "../utfdump_core" }
 libshire = { git = "https://github.com/pantonshire/libshire", branch = "main" }
 tabled = "0.8.0"
+clap = { version = "3.2.22", features = ["derive"] }
 
 [build-dependencies]
 utfdump_core = { path = "../utfdump_core" }
