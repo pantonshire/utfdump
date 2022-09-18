@@ -1,0 +1,12 @@
+[package]
+name = "utfdump"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+utfdump_core = { path = "../utfdump_core" }
+libshire = { git = "https://github.com/pantonshire/libshire", branch = "main" }
+tabled = "0.8.0"
+
+[build-dependencies]
+utfdump_core = { path = "../utfdump_core" }
