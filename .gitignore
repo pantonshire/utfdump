@@ -1,2 +1,4 @@
 /target
+/build
+/build.sh
 unicode_data_latest.txt
