@@ -2,5 +2,9 @@
 name = "utfdump_core"
 version = "0.1.0"
 edition = "2021"
+authors = ["Tom Panton <pantonshire@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/pantonshire/utfdump"
+description = "Core library for the utfdump command-line tool"
 
 [dependencies]

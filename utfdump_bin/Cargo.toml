@@ -2,6 +2,10 @@
 name = "utfdump"
 version = "0.1.0"
 edition = "2021"
+authors = ["Tom Panton <pantonshire@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/pantonshire/utfdump"
+description = "Command-line Unicode character info tool"
 
 [dependencies]
 utfdump_core = { path = "../utfdump_core" }
