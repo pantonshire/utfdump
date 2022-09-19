@@ -45,3 +45,6 @@ Arguments:
 | Short | Long                    | Effect                                                                             |
 |-------|-------------------------|------------------------------------------------------------------------------------|
 | `-f`  | `--full-category-names` | Display category names in plain English, rather than using their abbreviated names |
+
+## Download
+Pre-built binaries are available in [the GitHub releases](https://github.com/pantonshire/utfdump/releases/latest).
