@@ -11,6 +11,7 @@ const UNICODE_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/unicode_da
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
+    /// Display category names in plain English, rather than using their abbreviated names
     #[clap(short, long, action)]
     full_category_names: bool,
 }
