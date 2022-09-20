@@ -4,7 +4,7 @@ use std::fmt;
 pub struct CharData<'a> {
     name: &'a str,
     category: Category,
-    ccc: u8,
+    ccc: CombiningClass,
 }
 
 impl<'a> CharData<'a> {
@@ -17,12 +17,12 @@ impl<'a> CharData<'a> {
         let codepoint = u32::from_str_radix(fields[0], 16).ok()?;
         let name = fields[1];
         let category = Category::from_abbr(fields[2])?;
-        let ccc = u8::from_str_radix(fields[3], 10).ok()?;
+        let ccc = CombiningClass(u8::from_str_radix(fields[3], 10).ok()?);
 
         Some((codepoint, Self::from_parts(name, category, ccc)))
     }
 
-    pub fn from_parts(name: &'a str, category: Category, ccc: u8) -> Self {
+    pub fn from_parts(name: &'a str, category: Category, ccc: CombiningClass) -> Self {
         Self { name, category, ccc }
     }
 
@@ -41,7 +41,7 @@ impl<'a> CharData<'a> {
         self.category
     }
 
-    pub fn ccc(&self) -> u8 {
+    pub fn ccc(&self) -> CombiningClass {
         self.ccc
     }
 }
@@ -232,6 +232,51 @@ impl Category {
 impl fmt::Display for Category {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.abbr())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CombiningClass(pub u8);
+
+impl CombiningClass {
+    pub fn name(self) -> Option<&'static str> {
+        match self.0 {
+            0 => Some("Not_Reordered"),
+            1 => Some("Overlay"),
+            6 => Some("Han_Reading"),
+            7 => Some("Nukta"),
+            8 => Some("Kana_Voicing"),
+            9 => Some("Virama"),
+            200 => Some("Attached_Below_Left"),
+            202 => Some("Attached_Below"),
+            214 => Some("Attached_Above"),
+            216 => Some("Attached_Above_Right"),
+            218 => Some("Below_Left"),
+            220 => Some("Below"),
+            222 => Some("Below_Right"),
+            224 => Some("Left"),
+            226 => Some("Right"),
+            228 => Some("Above_Left"),
+            230 => Some("Above"),
+            232 => Some("Above_Right"),
+            233 => Some("Double_Below"),
+            234 => Some("Double_Above"),
+            240 => Some("Iota_Subscript"),
+            _ => None,
+        }
+    }
+
+    pub fn is_combining(self) -> bool {
+        self.0 != 0
+    }
+}
+
+impl fmt::Display for CombiningClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.name() {
+            Some(name) => write!(f, "{}", name),
+            None => write!(f, "Ccc{}", self.0),
+        }
     }
 }
 

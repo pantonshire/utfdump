@@ -1,13 +1,13 @@
 use std::{collections::{HashMap, hash_map}, error, fmt, str, ops::Range};
 
-use crate::chardata::{CharData, Category};
+use crate::chardata::{CharData, Category, CombiningClass};
 
 const DATA_ENTRY_SIZE: usize = 8;
 
 const DATA_INIT_FLAG: u8 = 1;
 const DATA_REPEATED_FLAG: u8 = 2;
 
-fn encode_char_data(name_index: u32, category: Category, ccc: u8, repeated: bool) -> [u8; DATA_ENTRY_SIZE] {
+fn encode_char_data(name_index: u32, category: Category, ccc: CombiningClass, repeated: bool) -> [u8; DATA_ENTRY_SIZE] {
     let mut buf = [0u8; DATA_ENTRY_SIZE];
 
     buf[0] |= DATA_INIT_FLAG;
@@ -18,12 +18,12 @@ fn encode_char_data(name_index: u32, category: Category, ccc: u8, repeated: bool
 
     buf[1..5].copy_from_slice(&name_index.to_le_bytes());
     buf[5] = category.byte_repr();
-    buf[6] = ccc;
+    buf[6] = ccc.0;
 
     buf
 }
 
-fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE]) -> Option<(u32, Category, u8, bool)> {
+fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE]) -> Option<(u32, Category, CombiningClass, bool)> {
     let flags = bytes[0];
     
     if flags & DATA_INIT_FLAG == 0 {
@@ -32,7 +32,7 @@ fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE]) -> Option<(u32, Category, u8, 
 
     let name_index = u32::from_le_bytes(bytes[1..5].try_into().unwrap());
     let category = Category::from_byte(bytes[5])?;
-    let ccc = bytes[6];
+    let ccc = CombiningClass(bytes[6]);
     let repeated = flags & DATA_REPEATED_FLAG != 0;
 
     Some((name_index, category, ccc, repeated))

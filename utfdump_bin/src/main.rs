@@ -4,7 +4,7 @@ use clap::Parser;
 use libshire::strings::CappedString;
 use tabled::{Tabled, Table, Style};
 
-use utfdump_core::{chardata::Category, encoded::Data};
+use utfdump_core::{chardata::{Category, CombiningClass}, encoded::Data};
 
 const UNICODE_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/unicode_data_encoded"));
 
@@ -50,7 +50,7 @@ fn main() {
 
                 let ccc = char_data.ccc();
                 char_combining_class = Optional::Some(ccc);
-                combining = ccc != 0;
+                combining = ccc.is_combining();
             }
 
             let display_char = {
@@ -91,7 +91,7 @@ struct OutRow {
     #[tabled(rename = "Category")]
     category: Optional<DisplayCategory>,
     #[tabled(rename = "Combining")]
-    char_combining_class: Optional<u8>,
+    char_combining_class: Optional<CombiningClass>,
 }
 
 #[derive(Debug)]
