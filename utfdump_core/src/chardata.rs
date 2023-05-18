@@ -4,7 +4,7 @@ use std::fmt;
 pub struct CharData<'a> {
     name: &'a str,
     category: Category,
-    ccc: CombiningClass,
+    combining_class: CombiningClass,
 }
 
 impl<'a> CharData<'a> {
@@ -22,8 +22,8 @@ impl<'a> CharData<'a> {
         Some((codepoint, Self::from_parts(name, category, ccc)))
     }
 
-    pub fn from_parts(name: &'a str, category: Category, ccc: CombiningClass) -> Self {
-        Self { name, category, ccc }
+    pub fn from_parts(name: &'a str, category: Category, combining_class: CombiningClass) -> Self {
+        Self { name, category, combining_class }
     }
 
     pub fn with_name<'b>(self, name: &'a str) -> CharData<'b>
@@ -41,44 +41,43 @@ impl<'a> CharData<'a> {
         self.category
     }
 
-    pub fn ccc(&self) -> CombiningClass {
-        self.ccc
+    pub fn combining_class(&self) -> CombiningClass {
+        self.combining_class
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[repr(u8)]
 pub enum Category {
-    Lu = 0,
-    Ll = 1,
-    Lt = 2,
-    Mn = 3,
-    Mc = 4,
-    Me = 5,
-    Nd = 6,
-    Nl = 7,
-    No = 8,
-    Zs = 9,
-    Zl = 10,
-    Zp = 11,
-    Cc = 12,
-    Cf = 13,
-    Cs = 14,
-    Co = 15,
-    Cn = 16,
-    Lm = 17,
-    Lo = 18,
-    Pc = 19,
-    Pd = 20,
-    Ps = 21,
-    Pe = 22,
-    Pi = 23,
-    Pf = 24,
-    Po = 25,
-    Sm = 26,
-    Sc = 27,
-    Sk = 28,
-    So = 29,
+    Lu,
+    Ll,
+    Lt,
+    Mn,
+    Mc,
+    Me,
+    Nd,
+    Nl,
+    No,
+    Zs,
+    Zl,
+    Zp,
+    Cc,
+    Cf,
+    Cs,
+    Co,
+    Cn,
+    Lm,
+    Lo,
+    Pc,
+    Pd,
+    Ps,
+    Pe,
+    Pi,
+    Pf,
+    Po,
+    Sm,
+    Sc,
+    Sk,
+    So,
 }
 
 impl Category {

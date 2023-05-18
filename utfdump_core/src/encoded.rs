@@ -7,7 +7,13 @@ const DATA_ENTRY_SIZE: usize = 8;
 const DATA_INIT_FLAG: u8 = 1;
 const DATA_REPEATED_FLAG: u8 = 2;
 
-fn encode_char_data(name_index: u32, category: Category, ccc: CombiningClass, repeated: bool) -> [u8; DATA_ENTRY_SIZE] {
+fn encode_char_data(
+    name_index: u32,
+    category: Category,
+    combining_class: CombiningClass,
+    repeated: bool
+) -> [u8; DATA_ENTRY_SIZE]
+{
     let mut buf = [0u8; DATA_ENTRY_SIZE];
 
     buf[0] |= DATA_INIT_FLAG;
@@ -18,12 +24,14 @@ fn encode_char_data(name_index: u32, category: Category, ccc: CombiningClass, re
 
     buf[1..5].copy_from_slice(&name_index.to_le_bytes());
     buf[5] = category.byte_repr();
-    buf[6] = ccc.0;
+    buf[6] = combining_class.0;
 
     buf
 }
 
-fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE]) -> Option<(u32, Category, CombiningClass, bool)> {
+fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE])
+    -> Option<(u32, Category, CombiningClass, bool)>
+{
     let flags = bytes[0];
     
     if flags & DATA_INIT_FLAG == 0 {
@@ -32,10 +40,10 @@ fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE]) -> Option<(u32, Category, Comb
 
     let name_index = u32::from_le_bytes(bytes[1..5].try_into().unwrap());
     let category = Category::from_byte(bytes[5])?;
-    let ccc = CombiningClass(bytes[6]);
+    let combining_class = CombiningClass(bytes[6]);
     let repeated = flags & DATA_REPEATED_FLAG != 0;
 
-    Some((name_index, category, ccc, repeated))
+    Some((name_index, category, combining_class, repeated))
 }
 
 pub struct DataBuf {
@@ -62,7 +70,10 @@ impl DataBuf {
             return Ok(());
         }
 
-        let repeated = range.end - range.start > 1;
+        let repeated = range.end
+            .checked_sub(range.start)
+            .map(|len| len > 1)
+            .unwrap_or(false);
 
         let range = {
             let start = usize::try_from(range.start)
@@ -86,7 +97,7 @@ impl DataBuf {
         let encoded_char_data = encode_char_data(
             name_index,
             char_data.category(),
-            char_data.ccc(),
+            char_data.combining_class(),
             repeated
         );
 
@@ -121,8 +132,8 @@ pub struct Data<'a> {
 }
 
 impl<'a> Data<'a> {
-    pub fn get(self, codepoint: u32) -> Option<CharData<'a>> {
-        let index = usize::try_from(codepoint).ok()?;
+    pub fn get(self, codepoint: char) -> Option<CharData<'a>> {
+        let index = usize::try_from(u32::from(codepoint)).ok()?;
         let start = index.checked_mul(DATA_ENTRY_SIZE)?;
         let end = start.checked_add(DATA_ENTRY_SIZE)?;
         let encoded = self.data.get(start..end)?;

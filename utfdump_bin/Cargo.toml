@@ -1,5 +1,5 @@
 [package]
-name = "utfdump"
+name = "utfdump_bin"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tom Panton <pantonshire@gmail.com>"]
@@ -8,10 +8,7 @@ repository = "https://github.com/pantonshire/utfdump"
 description = "Command-line Unicode character info tool"
 
 [dependencies]
-utfdump_core = { path = "../utfdump_core" }
+utfdump = { path = "../utfdump" }
 libshire = { git = "https://github.com/pantonshire/libshire", branch = "main" }
 tabled = "0.8.0"
 clap = { version = "3.2.22", features = ["derive"] }
-
-[build-dependencies]
-utfdump_core = { path = "../utfdump_core" }

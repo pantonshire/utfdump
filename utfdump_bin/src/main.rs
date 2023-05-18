@@ -3,10 +3,7 @@ use std::{fmt, io::{self, Read}};
 use clap::Parser;
 use libshire::strings::CappedString;
 use tabled::{Tabled, Table, Style};
-
-use utfdump_core::{chardata::{Category, CombiningClass}, encoded::Data};
-
-const UNICODE_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/unicode_data_encoded"));
+use utfdump::{char_data, CombiningClass, Category, utf8::{Utf8Decode, Utf8Error}};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -19,58 +16,18 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let data = Data::<'static>::from_bytes(UNICODE_DATA).unwrap();
-
     let input = {
         let mut buf = Vec::<u8>::new();
         let stdin = io::stdin();
         let mut guard = stdin.lock();
         guard.read_to_end(&mut buf)
             .expect("failed to read stdin");
-        // TODO: just skip over invalid utf-8 characters
-        String::from_utf8(buf)
-            .expect("invalid utf-8")
+        buf
     };
 
     let rows = input
-        .chars()
-        .map(|c| {
-            let mut name = Optional::None;
-            let mut category = Optional::None;
-            let mut char_combining_class = Optional::None;
-            
-            let mut combining = false;
-
-            if let Some(char_data) = data.get(c as u32) {
-                name = Optional::Some(char_data.name());
-                category = Optional::Some(DisplayCategory {
-                    category: char_data.category(),
-                    full_name: args.full_category_names,
-                });
-
-                let ccc = char_data.ccc();
-                char_combining_class = Optional::Some(ccc);
-                combining = ccc.is_combining();
-            }
-
-            let display_char = {
-                let mut buf = CappedString::empty();
-                if combining {
-                    buf.push_truncating('\u{25cc}');
-                }
-                buf.push_truncating(c);
-                buf
-            };
-
-            OutRow {
-                display_char,
-                codepoint: Codepoint(c),
-                utf_8_bytes: Utf8Bytes(c),
-                name,
-                category,
-                char_combining_class,
-            }
-        });
+        .decode_utf8()
+        .map(|c| OutRow::from_char_result(c, args.full_category_names));
 
     let table = Table::new(rows)
         .with(Style::modern());
@@ -83,7 +40,7 @@ struct OutRow {
     #[tabled(rename = "")]
     display_char: CappedString<8>, 
     #[tabled(rename = "Code")]
-    codepoint: Codepoint,
+    codepoint: Optional<Codepoint>,
     #[tabled(rename = "UTF-8")]
     utf_8_bytes: Utf8Bytes,
     #[tabled(rename = "Name")]
@@ -92,6 +49,69 @@ struct OutRow {
     category: Optional<DisplayCategory>,
     #[tabled(rename = "Combining")]
     char_combining_class: Optional<CombiningClass>,
+}
+
+impl OutRow {
+    fn from_char_result(c: Result<char, Utf8Error>, full_category_names: bool) -> Self {
+        match c {
+            Ok(c) => Self::from_good_char(c, full_category_names),
+            Err(err) => Self::from_bad_char(err),
+        }
+    }
+
+    fn from_good_char(c: char, full_category_names: bool) -> Self {
+        let mut name = Optional::None;
+        let mut category = Optional::None;
+        let mut char_combining_class = Optional::None;
+        
+        let mut combining = false;
+
+        if let Some(char_data) = char_data(c) {
+            name = Optional::Some(char_data.name());
+            category = Optional::Some(DisplayCategory {
+                category: char_data.category(),
+                full_name: full_category_names,
+            });
+
+            let ccc = char_data.combining_class();
+            char_combining_class = Optional::Some(ccc);
+            combining = ccc.is_combining();
+        }
+
+        let display_char = {
+            let mut buf = CappedString::empty();
+            if combining {
+                buf.push_truncating('\u{25cc}');
+            }
+            buf.push_truncating(c);
+            buf
+        };
+
+        Self {
+            display_char,
+            codepoint: Optional::Some(Codepoint(c)),
+            utf_8_bytes: Utf8Bytes::from_char(c),
+            name,
+            category,
+            char_combining_class,
+        }
+    }
+
+    fn from_bad_char(err: Utf8Error) -> Self {
+        let (bad_bytes, num_bad_bytes) = err.into_parts();
+
+        Self {
+            display_char: CappedString::new_truncating("\u{fffd}"),
+            codepoint: Optional::None,
+            utf_8_bytes: Utf8Bytes {
+                buf: bad_bytes,
+                len: num_bad_bytes,
+            },
+            name: Optional::Some("<invalid>"),
+            category: Optional::None,
+            char_combining_class: Optional::None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -122,13 +142,27 @@ impl fmt::Display for Codepoint {
 }
 
 #[derive(Debug)]
-struct Utf8Bytes(char);
+struct Utf8Bytes {
+    buf: [u8; 4],
+    len: usize,
+}
+
+impl Utf8Bytes {
+    fn from_char(c: char) -> Self {
+        let mut buf = [0u8; 4];
+        let string = c.encode_utf8(&mut buf);
+        let len = string.len();
+        Self { buf, len }
+    }
+
+    fn bytes(&self) -> &[u8] {
+        &self.buf[..self.len]
+    }
+}
 
 impl fmt::Display for Utf8Bytes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buf = [0u8; 4];
-        let s = self.0.encode_utf8(&mut buf);
-        let mut bytes = s.bytes();
+        let mut bytes = self.bytes().iter().copied();
         if let Some(b) = bytes.next() {
             write!(f, "0x{:02x}", b)?;
             for b in bytes {
