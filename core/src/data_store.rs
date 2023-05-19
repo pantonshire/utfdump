@@ -1,6 +1,9 @@
-use std::{collections::{HashMap, hash_map}, error, fmt, str, ops::Range};
+use std::{collections::{HashMap, hash_map}, error, fmt, ops::Range};
 
-use crate::chardata::{CharData, Category, CombiningClass};
+use crate::{
+    char_data::{CharData, Category, CombiningClass},
+    string_table::{StringTableBufError, StringTableBuf, StringTable},
+};
 
 const DATA_ENTRY_SIZE: usize = 8;
 
@@ -46,13 +49,13 @@ fn decode_char_data(bytes: [u8; DATA_ENTRY_SIZE])
     Some((name_index, category, combining_class, repeated))
 }
 
-pub struct DataBuf {
+pub struct DataStoreBuf {
     data: Vec<u8>,
     strings: StringTableBuf,
     strings_map: HashMap<String, u32>,
 }
 
-impl DataBuf {
+impl DataStoreBuf {
     pub fn new() -> Self {
         Self {
             data: Vec::new(),
@@ -61,8 +64,8 @@ impl DataBuf {
         }
     }
 
-    pub fn as_ref_type(&self) -> Data {
-        Data { data: &self.data, strings: self.strings.as_ref_type() }
+    pub fn as_ref_type(&self) -> DataStore {
+        DataStore { data: &self.data, strings: &*self.strings }
     }
 
     pub fn insert(&mut self, char_data: CharData, range: Range<u32>) -> Result<(), DataBufError> {
@@ -126,12 +129,12 @@ impl DataBuf {
 }
 
 #[derive(Clone, Copy)]
-pub struct Data<'a> {
+pub struct DataStore<'a> {
     data: &'a [u8],
-    strings: StringTable<'a>,
+    strings: &'a StringTable,
 }
 
-impl<'a> Data<'a> {
+impl<'a> DataStore<'a> {
     pub fn get(self, codepoint: char) -> Option<CharData<'a>> {
         let index = usize::try_from(u32::from(codepoint)).ok()?;
         let start = index.checked_mul(DATA_ENTRY_SIZE)?;
@@ -184,73 +187,3 @@ impl From<StringTableBufError> for DataBufError {
         Self::StringTable(err)
     }
 }
-
-#[derive(Clone, Copy)]
-pub struct StringTable<'a> {
-    bytes: &'a [u8],
-}
-
-impl<'a> StringTable<'a> {
-    pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        Self { bytes }
-    }
-
-    pub fn to_bytes(self) -> &'a [u8] {
-        self.bytes
-    }
-
-    pub fn get(self, index: u32) -> Option<&'a str> {
-        let index = usize::try_from(index).ok()?;
-        let len = *self.bytes.get(index)?;
-        let bytes = self.bytes.get((index + 1)..(index + 1 + usize::from(len)))?;
-        str::from_utf8(bytes).ok()
-    }
-}
-
-pub struct StringTableBuf {
-    buf: Vec<u8>,
-}
-
-impl StringTableBuf {
-    pub fn new() -> Self {
-        Self { buf: Vec::new() }
-    }
-
-    pub fn as_ref_type(&self) -> StringTable {
-        StringTable { bytes: &self.buf }
-    }
-
-    pub fn push(&mut self, s: &str) -> Result<u32, StringTableBufError> {
-        let len = u8::try_from(s.len())
-            .map_err(|_| StringTableBufError::StringTooLong)?;
-
-        let index = u32::try_from(self.buf.len())
-            .map_err(|_| StringTableBufError::OutOfCapacity)?;
-
-        self.buf.try_reserve(s.len() + 1)
-            .map_err(|_| StringTableBufError::OutOfCapacity)?;
-
-        self.buf.push(len);
-        self.buf.extend(s.bytes());
-        
-        Ok(index)
-    }
-}
-
-#[derive(Debug)]
-pub enum StringTableBufError {
-    StringTooLong,
-    OutOfCapacity,
-}
-
-impl fmt::Display for StringTableBufError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StringTooLong => write!(f, "string too long to add to table"),
-            Self::OutOfCapacity => write!(f, "string table out of capacity"),
-        }
-    }
-}
-
-impl error::Error for StringTableBufError {}
-

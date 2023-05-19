@@ -1,6 +1,6 @@
 use std::{env, fs::File, io::{BufReader, BufRead, Write}, path::Path};
 
-use utfdump_core::{chardata::CharData, encoded::DataBuf};
+use utfdump_core::{CharData, DataStoreBuf};
 
 const UNICODE_DATA_PATH: &str = "unicode_data_latest.txt";
 const OUT_DATA_PATH: &str = "unicode_data_encoded";
@@ -16,7 +16,7 @@ fn main() {
 
     let buf_reader = BufReader::new(data_file);
  
-    let mut data = DataBuf::new();
+    let mut data = DataStoreBuf::new();
     let mut start_codepoint = None;
 
     for line in buf_reader.lines() {

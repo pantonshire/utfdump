@@ -8,7 +8,7 @@ repository = "https://github.com/pantonshire/utfdump"
 description = "Command-line Unicode character info tool"
 
 [dependencies]
-utfdump = { path = "../utfdump" }
+utfdump = { path = "../lib" }
 libshire = { git = "https://github.com/pantonshire/libshire", branch = "main" }
 tabled = "0.8.0"
 clap = { version = "3.2.22", features = ["derive"] }

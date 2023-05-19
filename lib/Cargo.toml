@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-utfdump_core = { path = "../utfdump_core" }
+utfdump_core = { path = "../core" }
 once_cell = "1.17.1"
 
 [build-dependencies]
-utfdump_core = { path = "../utfdump_core" }
+utfdump_core = { path = "../core" }

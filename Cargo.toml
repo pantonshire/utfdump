@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "utfdump_core",
-    "utfdump",
-    "utfdump_bin",
+    "core",
+    "lib",
+    "bin",
 ]
