@@ -35,7 +35,7 @@ class StringTable:
 
     def push(self, s: str) -> StringTableIndex:
         if s in self.__map:
-            return self.__map[s]
+            return StringTableIndex.from_int(self.__map[s])
         
         insert_pos = len(self.__buf)
         s_bytes = s.encode(encoding='utf-8')
@@ -168,22 +168,34 @@ def encode_char_data(
     lowercase: StringTableIndex,
     titlecase: StringTableIndex
 ) -> bytes:
-    # TODO: use a single "flags" byte to store:
-    # - mirrored
-    # - decomp_kind (5 bits needed)
-
     encoded = bytearray()
 
     # Pack the category, bidirectional category, decomposition kind and mirrored boolean into two
     # bytes.
     flags = 0
-    flags |= int(category) & 0x1f
-    flags |= (int(bidi) & 0x1f) << 5
-    flags |= (int(decomp_kind) & 0x1f) << 10
+    flags |= category.value & 0x1f
+    flags |= (bidi.value & 0x1f) << 5
+    flags |= (decomp_kind.value & 0x1f) << 10
     flags |= int(mirrored) << 15
     encoded.extend(flags.to_bytes(length=2, byteorder='little'))
 
-    # 4 bits decimal digit, 4 bits digit (max is 9). Both need bit patterns for "none"
+    encoded.extend(name.to_bytes())
+    encoded.extend(decomp.to_bytes())
+    encoded.extend(numeric_value.to_bytes())
+    encoded.extend(old_name.to_bytes())
+    encoded.extend(comment.to_bytes())
+    encoded.extend(uppercase.to_bytes())
+    encoded.extend(lowercase.to_bytes())
+    encoded.extend(titlecase.to_bytes())
+
+    encoded.extend(combining.to_bytes(length=1, byteorder='little'))
+
+    if decimal_digit is None:
+        decimal_digit = 0xf
+    if digit is None:
+        digit = 0xf
+    digit_vals = (decimal_digit & 0xf) | ((digit << 4) & 0xf)
+    encoded.extend(digit_vals.to_bytes(length=1, byteorder='little'))
 
     assert len(encoded) == 28
 
@@ -248,7 +260,7 @@ for row in input_data.splitlines():
         continue
 
     if cell_name.startswith('<') and cell_name.endswith(', First>'):
-        name = cell_name.removeprefix('<').removesuffix(', First>')
+        name = string_table.push(cell_name.removeprefix('<').removesuffix(', First>'))
         in_group = True
     else:
         name = string_table.push(cell_name)
@@ -319,7 +331,7 @@ for row in input_data.splitlines():
     else:
         titlecase = StringTableIndex.invalid()
 
-    encoded = encode_char_data(
+    char_data_table.extend(encode_char_data(
         code,
         name,
         category,
@@ -336,12 +348,7 @@ for row in input_data.splitlines():
         uppercase,
         lowercase,
         titlecase
-    )
+    ))
 
+print(len(char_data_table))
 print(len(string_table.to_bytes()))
-
-# for k in uniq_vals.keys():
-#     print(k)
-
-# for group in groups:
-#     print(group)
