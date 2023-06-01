@@ -51,6 +51,7 @@
 from enum import Enum
 from struct import pack
 from typing import Optional
+from gzip import compress
 
 class StringTableIndex:
     def __init__(self, bs: bytes):
@@ -422,5 +423,7 @@ encoded_data.extend(group_table)
 encoded_data.extend(char_data_table)
 encoded_data.extend(string_table)
 
-with open('unicode_data_encoded', 'wb') as fd:
-    fd.write(encoded_data)
+compressed_data = compress(encoded_data)
+
+with open('unicode_data_encoded.gz', 'wb') as fd:
+    fd.write(compressed_data)
