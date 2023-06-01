@@ -1,11 +1,56 @@
+# # Encoded data format
+# N.B:
+# - All integers are encoded in little-endian order
+# - Indices into the string table are 3 bytes and point to the length of the string in the string
+#   table, which is immediately followed by the string itself.
+# - The string table index 0xffffff indicates an invalid index.
+# 
+# The overall layout of the encoded data is:
+# - 8 byte magic number: UTFDUMP!
+# - 4 byte group table length (in bytes)
+# - 4 byte char table length (in bytes)
+# - 4 byte string table length (in bytes)
+# - Group table
+# - Char table
+# - String table
+# 
+# ## Group table format
+# Each entry is 13 bytes and consists of:
+# - 4 byte start codepoint
+# - 4 byte end codepoint (inclusive)
+# - 4 byte cumulative lengths of all previous groups
+# - 1 byte group kind
+#   - 0: no character data associated with group
+#   - 1: group shares character data with codepoint immediately before the start of the group
+# 
+# ## Char table format
+# Each entry is 28 bytes and consists of:
+# - 2 byte packed data
+#   - First (least significant) 5 bits are general category
+#   - Next 5 bits are bidirectional category
+#   - Next 5 bits are decomposition kind
+#   - Last bit is mirrored boolean
+# - 3 byte string table index for name
+# - 3 byte string table index for decomposition
+# - 3 byte string table index for numeric value
+# - 3 byte string table index for old Unicode 1.0 name
+# - 3 byte string table index for comment
+# - 3 byte string table index for uppercase
+# - 3 byte string table index for lowercase
+# - 3 byte string table index for titlecase
+# - 1 byte combining class
+# - 1 byte for decimal digit value and digit value
+#   - First (least significant) 4 bits are decimal digit value
+#   - Last 4 bits are digit value
+#
+# ## String table format
+# Each entry consists of:
+# - 1 byte string length
+# - UTF-8 encoded string
+
 from enum import Enum
 from struct import pack
 from typing import Optional
-
-# FIXME:
-# Rather than creating many duplicated entries for "first / last" blocks, include a series of
-# rules in the encoded file about what regions are duplicated / what ranges of codepoints need
-# to be offset when using them to index into the table.
 
 class StringTableIndex:
     def __init__(self, bs: bytes):
@@ -127,7 +172,7 @@ class DecompKind(Enum):
 
 class GroupKind(Enum):
     NO_VALUE = 0
-    HAS_VALUE = 1
+    USE_PREV_VALUE = 1
 
 class Group:
     def __init__(self, kind: GroupKind, start: int, end: int):
@@ -177,7 +222,7 @@ def encode_char_data(
     flags |= (bidi.value & 0x1f) << 5
     flags |= (decomp_kind.value & 0x1f) << 10
     flags |= int(mirrored) << 15
-    encoded.extend(flags.to_bytes(length=2, byteorder='little'))
+    encoded.extend(flags.to_bytes(length=2, byteorder='little', signed=False))
 
     encoded.extend(name.to_bytes())
     encoded.extend(decomp.to_bytes())
@@ -188,14 +233,14 @@ def encode_char_data(
     encoded.extend(lowercase.to_bytes())
     encoded.extend(titlecase.to_bytes())
 
-    encoded.extend(combining.to_bytes(length=1, byteorder='little'))
+    encoded.extend(combining.to_bytes(length=1, byteorder='little', signed=False))
 
     if decimal_digit is None:
         decimal_digit = 0xf
     if digit is None:
         digit = 0xf
     digit_vals = (decimal_digit & 0xf) | ((digit << 4) & 0xf)
-    encoded.extend(digit_vals.to_bytes(length=1, byteorder='little'))
+    encoded.extend(digit_vals.to_bytes(length=1, byteorder='little', signed=False))
 
     assert len(encoded) == 28
 
@@ -244,7 +289,7 @@ for row in input_data.splitlines():
     # know both the start and end codepoints of the group, so we can append it to the groups list.
     if in_group:
         assert cell_name.startswith('<') and cell_name.endswith(', Last>')
-        groups.append(Group(GroupKind.HAS_VALUE, prev_code, code))
+        groups.append(Group(GroupKind.USE_PREV_VALUE, prev_code + 1, code))
 
     # If there is a gap between the previous codepoint and this codepoint, add a "no value" group
     # to the list of groups to indicate the gap.
@@ -350,5 +395,32 @@ for row in input_data.splitlines():
         titlecase
     ))
 
-print(len(char_data_table))
-print(len(string_table.to_bytes()))
+group_table = bytearray()
+cumulative_offset = 0
+
+for group in groups:
+    group_table_entry = bytearray()
+    group_table_entry.extend(group.start().to_bytes(length=4, byteorder='little', signed=False))
+    group_table_entry.extend(group.end().to_bytes(length=4, byteorder='little', signed=False))
+    # Include the sum of the lengths of all groups before this one.
+    group_table_entry.extend(cumulative_offset.to_bytes(length=4, byteorder='little', signed=False))
+    group_table_entry.extend(group.kind().value.to_bytes(length=1, byteorder='little', signed=False))
+    assert len(group_table_entry) == 13
+    group_table.extend(group_table_entry)
+
+    # Calculate the length of this group and add it to the cumulative total.
+    cumulative_offset += (group.end() - group.start()) + 1
+
+string_table = string_table.to_bytes()
+
+encoded_data = bytearray()
+encoded_data.extend(b'UTFDUMP!')
+encoded_data.extend(len(group_table).to_bytes(length=4, byteorder='little', signed=False))
+encoded_data.extend(len(char_data_table).to_bytes(length=4, byteorder='little', signed=False))
+encoded_data.extend(len(string_table).to_bytes(length=4, byteorder='little', signed=False))
+encoded_data.extend(group_table)
+encoded_data.extend(char_data_table)
+encoded_data.extend(string_table)
+
+with open('unicode_data_encoded', 'wb') as fd:
+    fd.write(encoded_data)
