@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use core::iter::Peekable;
 
 pub trait ToByte {
     fn to_byte(self) -> u8;
@@ -186,7 +186,7 @@ impl Utf8Error {
 
 #[cfg(test)]
 mod tests {
-    use std::char::REPLACEMENT_CHARACTER;
+    use core::char::REPLACEMENT_CHARACTER;
 
     use super::Utf8Decode;
 
