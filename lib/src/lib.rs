@@ -31,6 +31,7 @@ mod tests {
         let data = unicode_data::UnicodeData::from_bytes(UNICODE_DATA_BYTES)
             .unwrap();
 
-        println!("{:#?}", data.groups());
+        // println!("{:#?}", data.groups());
+        println!("{:#?}", data.chars());
     }
 }

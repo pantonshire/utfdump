@@ -24,7 +24,7 @@ impl<'a> UnicodeData<'a> {
         let string_table_len = bs.consume_4_byte_len()?;
 
         let group_table = bs.consume(group_table_len)?.pipe(GroupTable::new)?;
-        let char_table = bs.consume(char_table_len)?.pipe(CharTable::new);
+        let char_table = bs.consume(char_table_len)?.pipe(CharTable::new)?;
         let string_table = bs.consume(string_table_len)?.pipe(StringTable::new);
         
         bs.check_empty()?;
@@ -32,13 +32,13 @@ impl<'a> UnicodeData<'a> {
         Ok(Self { group_table, char_table, string_table })
     }
 
-    pub(crate) fn groups(self) -> GroupTable<'a> {
-        self.group_table
+    pub(crate) fn chars(self) -> CharTable<'a> {
+        self.char_table
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct GroupTable<'a> {
+struct GroupTable<'a> {
     entries: &'a [GroupTableEntry],
 }
 
@@ -93,15 +93,68 @@ impl GroupTableEntry {
     const SIZE: usize = mem::size_of::<Self>();
 }
 
+#[derive(Debug)]
 #[derive(Clone, Copy)]
-struct CharTable<'a> {
-    inner: &'a [u8],
+pub(crate) struct CharTable<'a> {
+    entries: &'a [CharTableEntry],
 }
 
 impl<'a> CharTable<'a> {
-    fn new(bs: &'a [u8]) -> Self {
-        Self { inner: bs }
+    fn new(bs: &'a [u8]) -> Result<Self, UnicodeDataError> {
+        if bs.len() % CharTableEntry::SIZE != 0 {
+            return Err(UnicodeDataError::InvalidTableSize);
+        }
+
+        let num_entries = bs.len() / CharTableEntry::SIZE;
+
+        // SAFETY:
+        // - The pointer is valid for reads of `num_entries * mem::size_of::<CharTableEntry>()`
+        //   bytes; `num_entries = bs.len() / mem::size_of::<CharTableEntry>()`, so
+        //   `num_entries * mem::size_of::<CharTableEntry>() <= bs.len()` (the inequality is due
+        //   to flooring integer division), and clearly a pointer to `bs` is valid for reads of
+        //   <= `bs.len()` bytes.
+        //
+        // - `u8` and `CharTableEntry` both have an alignment of 1 (since `CharTableEntry` is
+        //    packed), so the pointer is correctly aligned.
+        //
+        // - The pointer points to `num_entries` consecutive properly-initialised `CharTableEntry`
+        //   values, as `bs` contains initialised data and `CharTableEntry` consists only of
+        //   arrays of `u8` of varying sizes, for which any bit pattern is valid.
+        //
+        // - Since we obtained the pointer from an immutable reference `bs`, the data cannot be
+        //   mutated by safe code for the duration of the lifetime `'a`.
+        //
+        // - The total length of the slice does not exceed `isize::MAX`, since it is no larger
+        //   than `bs` which is a valid slice and therefore no larger than `isize::MAX`.
+        let entries = unsafe {
+            slice::from_raw_parts(
+                bs.as_ptr() as *const CharTableEntry,
+                num_entries
+            )
+        };
+        
+        Ok(Self { entries })
     }
+}
+
+#[derive(Debug)]
+#[repr(C, packed)]
+struct CharTableEntry {
+    flags_and_categories: U16Le,
+    name: U24Le,
+    decomp: U24Le,
+    numeric: U24Le,
+    old_name: U24Le,
+    comment: U24Le,
+    uppercase: U24Le,
+    lowercase: U24Le,
+    titlecase: U24Le,
+    combining: u8,
+    digit: u8,
+}
+
+impl CharTableEntry {
+    const SIZE: usize = mem::size_of::<Self>();
 }
 
 #[derive(Clone, Copy)]
