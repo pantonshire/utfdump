@@ -1,6 +1,15 @@
-use core::{fmt, mem, slice};
+use core::{fmt, mem, slice, str};
 
 use tap::Pipe;
+
+use crate::character::{
+    CharData,
+    Category,
+    BidiCategory,
+    OptionalDecompKind,
+    CombiningClass,
+    DecompMapping,
+};
 
 const MAGIC_NUMBER: [u8; 8] = *b"UTFDUMP!";
 
@@ -32,8 +41,73 @@ impl<'a> UnicodeData<'a> {
         Ok(Self { group_table, char_table, string_table })
     }
 
-    pub(crate) fn chars(self) -> CharTable<'a> {
-        self.char_table
+    pub fn get(self, codepoint: u32) -> Option<CharData<'a>> {
+        let entry = self.char_entry_for(codepoint)?;
+
+        let flags_and_categories = entry.flags_and_categories.to_u16();
+        let category = Category::decode((flags_and_categories & 0x1f) as u8)?;
+        let bidi = BidiCategory::decode(((flags_and_categories >> 5) & 0x1f) as u8)?;
+        let decomp_kind = OptionalDecompKind::decode(((flags_and_categories >> 10) & 0x1f) as u8)?;
+        let mirrored = (flags_and_categories >> 15) != 0;
+
+        let name = self.string_table.get_u24_le(entry.name)?;
+        
+        let decomp_value = self.string_table.get_u24_le(entry.decomp);
+        let decomp = match (decomp_kind, decomp_value) {
+            (OptionalDecompKind::None, _) | (_, None) => None,
+            (OptionalDecompKind::Anon, Some(value)) => {
+                Some(DecompMapping::new(None, value))
+            },
+            (OptionalDecompKind::Named(kind), Some(value)) => {
+                Some(DecompMapping::new(Some(kind), value))
+            },
+        };
+        
+        let numeric = self.string_table.get_u24_le(entry.numeric);
+        let old_name = self.string_table.get_u24_le(entry.old_name); 
+        let comment = self.string_table.get_u24_le(entry.comment);
+        let uppercase = self.string_table.get_u24_le(entry.uppercase);
+        let lowercase = self.string_table.get_u24_le(entry.lowercase);
+        let titlecase = self.string_table.get_u24_le(entry.titlecase);
+
+        let combining = CombiningClass(entry.combining);
+
+        let decimal_digit = match entry.digit & 0xf {
+            0xf => None,
+            n => Some(n),
+        };
+
+        let digit = match (entry.digit >> 4) & 0xf {
+            0xf => None,
+            n => Some(n),
+        };
+
+        Some(CharData {
+            codepoint,
+            name,
+            category,
+            combining,
+            bidi,
+            decomp,
+            decimal_digit,
+            digit,
+            numeric,
+            mirrored,
+            old_name,
+            comment,
+            uppercase,
+            lowercase,
+            titlecase,
+        })
+    }
+
+    fn char_entry_for(self, codepoint: u32) -> Option<&'a CharTableEntry> {
+        let index = self.group_table
+            .char_table_index_for(codepoint)?
+            .pipe(usize::try_from)
+            .ok()?;
+
+        self.char_table.get(index)
     }
 }
 
@@ -78,7 +152,73 @@ impl<'a> GroupTable<'a> {
 
         Ok(Self { entries })
     }
+
+    // TODO: compare performance of binary search to linear search
+    // TODO: fast path for characters before the first group
+    fn char_table_index_for(self, codepoint: u32) -> Option<u32> {
+        let mut entries = self.entries;
+        let mut offset = 0;
+
+        loop {
+            if entries.len() == 0 {
+                break codepoint.checked_sub(offset);
+            }
+
+            let midpoint = entries.len() / 2;
+            let entry = &entries[midpoint];
+            let start = entry.start.to_u32();
+            let end = entry.end.to_u32();
+            let total_len_before = entry.total_len_before.to_u32();
+
+            if start <= codepoint && codepoint <= end {
+                match entry.kind {
+                    GROUP_KIND_USE_PREV_VALUE => {
+                        // This group uses the same character data as the codepoint immediately
+                        // before the group start (`start - 1`). Subtract `total_len_before`, which
+                        // is the total length of all groups before this group, from `start - 1` to
+                        // find the index of its character data in the character table.
+                        break start
+                            .checked_sub(1)
+                            .expect("first codepoint for a USE_PREV_VALUE group should always be at least 1")
+                            .checked_sub(total_len_before)
+                            .expect("computed character data index should not underflow")
+                            .pipe(Some)
+                    },
+                    
+                    // If the codepoint is in a group which is not `USE_PREV_VALUE`, we take it to
+                    // be a codepoint with no associated character data.
+                    _ => break None,
+                }
+            } else if codepoint > end {
+                // Since the `end` is inclusive, the length of the group is calculated as
+                // `(end - start) + 1`.
+                let group_len = end
+                    .checked_sub(start)
+                    .expect("group start should be less than or equal to the group end")
+                    .checked_add(1)
+                    .expect("group length should not overflow a u32");
+
+                // `total_len_before` is the total length of all groups before this group, so we
+                // can calculate the total length of all groups up to and including this group by
+                // adding `group_len` to it. We assign this to `offset` because this is the group
+                // with the largest `end` value that is less than the codepoint, and is therefore
+                // the offset that should be used to calculate the character table index for this
+                // codepoint in the event that there are no groups with a larger `end` value less
+                // than the codepoint and the codepoint is not contained in a group.
+                offset = total_len_before
+                    .checked_add(group_len)
+                    .expect("cumulative group length should not overflow a u32");
+
+                entries = &entries[(midpoint + 1)..];
+            } else {
+                entries = &entries[..midpoint];
+            }
+        }
+    }
 }
+
+const GROUP_KIND_NO_VALUE: u8 = 0;
+const GROUP_KIND_USE_PREV_VALUE: u8 = 1;
 
 #[derive(Debug)]
 #[repr(C, packed)]
@@ -95,7 +235,7 @@ impl GroupTableEntry {
 
 #[derive(Debug)]
 #[derive(Clone, Copy)]
-pub(crate) struct CharTable<'a> {
+struct CharTable<'a> {
     entries: &'a [CharTableEntry],
 }
 
@@ -135,6 +275,10 @@ impl<'a> CharTable<'a> {
         
         Ok(Self { entries })
     }
+
+    fn get(self, i: usize) -> Option<&'a CharTableEntry> {
+        self.entries.get(i)
+    }
 }
 
 #[derive(Debug)]
@@ -166,6 +310,26 @@ impl<'a> StringTable<'a> {
     fn new(bs: &'a [u8]) -> Self {
         Self { inner: bs }
     }
+
+    fn get(self, i: usize) -> Option<&'a str> {
+        let len = usize::from(*self.inner.get(i)?);
+        
+        let str_start = i.checked_add(1)?;
+        let str_end = str_start.checked_add(len)?;
+
+        self.inner.get(str_start..str_end)
+            .and_then(|s| str::from_utf8(s).ok())
+    }
+
+    fn get_u24_le(self, i: U24Le) -> Option<&'a str> {
+        const NIL_INDEX_PATTERN: [u8; 3] = [0xff; 3];
+        
+        if i.0 == NIL_INDEX_PATTERN {
+            return None;
+        }
+
+        i.to_usize().and_then(|i| self.get(i))
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -193,6 +357,10 @@ impl U24Le {
         let mut buf = [0u8; 4];
         (&mut buf[..3]).copy_from_slice(&self.0);
         u32::from_le_bytes(buf)
+    }
+
+    fn to_usize(self) -> Option<usize> {
+        usize::try_from(self.to_u32()).ok()
     }
 }
 
