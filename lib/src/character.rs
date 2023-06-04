@@ -38,33 +38,37 @@ impl<'a> CharData<'a> {
         self.category
     }
 
+    pub fn combining_class(&self) -> CombiningClass {
+        self.combining
+    }
+
     #[inline]
     #[must_use]
-    pub fn bidi(&self) -> BidiCategory {
+    pub fn bidi_category(&self) -> BidiCategory {
         self.bidi
     }
 
     #[inline]
     #[must_use]
-    pub fn decomp(&self) -> Option<DecompMapping<'a>> {
+    pub fn decomp_mapping(&self) -> Option<DecompMapping<'a>> {
         self.decomp
     }
 
     #[inline]
     #[must_use]
-    pub fn decimal_digit(&self) -> Option<u8> {
+    pub fn decimal_digit_value(&self) -> Option<u8> {
         self.decimal_digit
     }
 
     #[inline]
     #[must_use]
-    pub fn digit(&self) -> Option<u8> {
+    pub fn digit_value(&self) -> Option<u8> {
         self.digit
     }
 
     #[inline]
     #[must_use]
-    pub fn numeric(&self) -> Option<&'a str> {
+    pub fn numeric_value(&self) -> Option<&'a str> {
         self.numeric
     }
 
@@ -76,7 +80,7 @@ impl<'a> CharData<'a> {
 
     #[inline]
     #[must_use]
-    pub fn old_name(&self) -> Option<&'a str> {
+    pub fn unicode_1_name(&self) -> Option<&'a str> {
         self.old_name
     }
 
