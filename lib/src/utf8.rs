@@ -197,64 +197,49 @@ mod tests {
 
     #[test]
     fn test_utf8_decoder() {
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0x68, 0x65, 0x6c, 0x6c, 0x6f
-            ]),
-            "hello"
-        );
-        
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0xce, 0xba, 0xe1, 0xbd, 0xb9, 0xcf, 0x83, 0xce, 0xbc, 0xce, 0xb5
-            ]),
-            "κόσμε"
-        );
+        assert_decodes_to(&[
+            0x68, 0x65, 0x6c, 0x6c, 0x6f
+        ], "hello");
+    
+        assert_decodes_to(&[
+            0xce, 0xba, 0xe1, 0xbd, 0xb9, 0xcf, 0x83, 0xce, 0xbc, 0xce, 0xb5
+        ], "κόσμε");
 
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0xf0, 0x9f, 0x8f, 0xb3, 0xef, 0xb8, 0x8f, 0xe2, 0x80, 0x8d, 0xe2, 0x9a, 0xa7, 0xef,
-                0xb8, 0x8f
-            ]),
-            "\u{1f3f3}\u{fe0f}\u{200d}\u{26a7}\u{fe0f}"
-        );
+        assert_decodes_to(&[
+            0xf0, 0x9f, 0x8f, 0xb3, 0xef, 0xb8, 0x8f, 0xe2, 0x80, 0x8d, 0xe2, 0x9a, 0xa7, 0xef,
+            0xb8, 0x8f
+        ], "\u{1f3f3}\u{fe0f}\u{200d}\u{26a7}\u{fe0f}");
 
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0xce, 0x61
-            ]),
-            "\u{fffd}a"
-        );
+        assert_decodes_to(&[
+            0xce, 0x61
+        ], "\u{fffd}a");
 
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0xce, 0xc2
-            ]),
-            "\u{fffd}\u{fffd}"
-        );
+        assert_decodes_to(&[
+            0xce, 0xc2
+        ], "\u{fffd}\u{fffd}");
 
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0x80
-            ]),
-            "\u{fffd}"
-        );
+        assert_decodes_to(&[
+            0x80
+        ], "\u{fffd}");
 
-        assert_eq!(
-            &decode_collect_lossy(&[
-                0x80, 0x80
-            ]),
-            "\u{fffd}\u{fffd}"
-        );
+        assert_decodes_to(&[
+            0x80, 0x80
+        ], "\u{fffd}\u{fffd}");
     }
 
-    fn decode_collect_lossy(bytes: &[u8]) -> String {
-        bytes
-            .decode_utf8()
-            .map(|res| match res {
-                Ok(c) => c,
-                Err(_) => REPLACEMENT_CHARACTER,
-            })
-            .collect()
+    fn assert_decodes_to(bytes: &[u8], expected: &str) {
+        let mut decoded = bytes.decode_utf8();
+
+        for expected_char in expected.chars() {
+            let decoded_char = match decoded.next() {
+                Some(Ok(c)) => Some(c),
+                Some(Err(_)) => Some(REPLACEMENT_CHARACTER),
+                None => None,
+            };
+
+            assert_eq!(decoded_char, Some(expected_char));
+        }
+
+        assert!(decoded.next().is_none());
     }
 }

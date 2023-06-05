@@ -3,6 +3,9 @@ name = "utfdump"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+std = []
+
 [dependencies]
 tap = "1.0.1"
 
