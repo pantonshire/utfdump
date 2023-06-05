@@ -52,6 +52,12 @@ from enum import Enum
 from struct import pack
 from typing import Optional
 from gzip import compress
+from time import time
+import http.client
+
+unicode_data_host = 'www.unicode.org'
+unicode_data_url_path = '/Public/UCD/latest/ucd/UnicodeData.txt'
+out_data_path = 'unicode_data_encoded.gz'
 
 class StringTableIndex:
     def __init__(self, bs: bytes):
@@ -247,19 +253,31 @@ def encode_char_data(
 
     return bytes(encoded)
 
-with open('unicode_data_latest.txt', 'r') as fd:
-    input_data = fd.read()
+print('Fetching Unicode data from {}...'.format(unicode_data_host))
+start_time = time()
+
+conn = http.client.HTTPConnection(unicode_data_host, timeout=30)
+conn.request('GET', unicode_data_url_path)
+resp = conn.getresponse()
+resp_data = resp.read()
+input_data = resp_data.decode('utf-8')
+
+end_time = time()
+print('Fetched Unicode data in {:.2f}s'.format(end_time - start_time))
 
 char_data_table = bytearray()
 string_table = StringTable()
-# FIXME: calculate cumulative offset required for codepoints after each group
 groups = []
 in_group = False
 prev_code = None
 
 uniq_vals = {}
 
-for row in input_data.splitlines():    
+rows = [row.strip() for row in input_data.splitlines() if len(row.strip()) > 0]
+
+print('Encoding {} rows...'.format(len(rows)))
+
+for row in rows:    
     is_group_start = False
 
     [
@@ -425,5 +443,9 @@ encoded_data.extend(string_table)
 
 compressed_data = compress(encoded_data)
 
-with open('unicode_data_encoded.gz', 'wb') as fd:
+print('Writing encoded data to {}...'.format(out_data_path))
+
+with open(out_data_path, 'wb') as fd:
     fd.write(compressed_data)
+
+print('Done!')
