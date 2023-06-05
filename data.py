@@ -57,7 +57,7 @@ import http.client
 
 unicode_data_host = 'www.unicode.org'
 unicode_data_url_path = '/Public/UCD/latest/ucd/UnicodeData.txt'
-out_data_path = 'unicode_data_encoded.gz'
+out_data_path = 'lib/unicode_data_encoded.gz'
 
 class StringTableIndex:
     def __init__(self, bs: bytes):

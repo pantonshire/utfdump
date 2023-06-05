@@ -1,6 +1,6 @@
 use std::{env, fs::File, io, path::Path};
 
-const COMPRESSED_DATA_PATH: &str = "../unicode_data_encoded.gz";
+const COMPRESSED_DATA_PATH: &str = "unicode_data_encoded.gz";
 const OUT_DATA_PATH: &str = "unicode_data_encoded";
 
 fn main() -> io::Result<()> {
