@@ -110,14 +110,14 @@ impl OutRow {
     }
 
     fn from_bad_char(err: Utf8Error) -> Self {
-        let (bad_bytes, num_bad_bytes) = err.into_parts();
+        let (bad_bytes, _num_bad_bytes, num_consumed_bad_bytes) = err.into_parts();
 
         Self {
             display_char: CappedString::new_truncating("\u{fffd}"),
             codepoint: Optional::None,
             utf_8_bytes: Utf8Bytes {
                 buf: bad_bytes,
-                len: num_bad_bytes,
+                len: num_consumed_bad_bytes,
             },
             name: Optional::Some("<invalid>"),
             category: Optional::None,

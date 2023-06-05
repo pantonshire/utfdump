@@ -128,6 +128,7 @@ where
                 return Some(Err(Utf8Error {
                     bad_bytes: bytes_seen,
                     num_bad_bytes: 1,
+                    num_consumed_bad_bytes: 1,
                 }));
             },
         }
@@ -140,6 +141,7 @@ where
                 None => return Some(Err(Utf8Error {
                     bad_bytes: bytes_seen,
                     num_bad_bytes: usize::from(i) + 1,
+                    num_consumed_bad_bytes: usize::from(i),
                 })),
             };
 
@@ -149,6 +151,7 @@ where
                 return Some(Err(Utf8Error {
                     bad_bytes: bytes_seen,
                     num_bad_bytes: usize::from(i) + 2,
+                    num_consumed_bad_bytes: usize::from(i) + 1,
                 }));
             }
 
@@ -172,6 +175,7 @@ where
 pub struct Utf8Error {
     bad_bytes: [u8; 4],
     num_bad_bytes: usize,
+    num_consumed_bad_bytes: usize,
 }
 
 impl Utf8Error {
@@ -179,8 +183,9 @@ impl Utf8Error {
         &self.bad_bytes[..self.num_bad_bytes]
     }
 
-    pub fn into_parts(self) -> ([u8; 4], usize) {
-        (self.bad_bytes, self.num_bad_bytes)
+    // FIXME: return some type with u8 array + length
+    pub fn into_parts(self) -> ([u8; 4], usize, usize) {
+        (self.bad_bytes, self.num_bad_bytes, self.num_consumed_bad_bytes)
     }
 }
 
