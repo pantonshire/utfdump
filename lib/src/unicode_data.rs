@@ -13,6 +13,8 @@ use crate::character::{
 
 const MAGIC_NUMBER: [u8; 8] = *b"UTFDUMP!";
 
+pub type StaticUnicodeData = UnicodeData<'static>;
+
 #[derive(Clone, Copy)]
 pub struct UnicodeData<'a> {
     group_table: GroupTable<'a>,
@@ -24,11 +26,13 @@ const UNICODE_DATA_BYTES: &[u8] = include_bytes!(
     concat!(env!("OUT_DIR"), "/unicode_data_encoded")
 );
 
-impl<'a> UnicodeData<'a> {
+impl UnicodeData<'static> {
     pub fn new() -> Result<Self, UnicodeDataError> {
         Self::from_bytes(UNICODE_DATA_BYTES)
     }
+}
 
+impl<'a> UnicodeData<'a> {
     pub(crate) fn from_bytes(bs: &'a [u8]) -> Result<Self, UnicodeDataError> {
         let mut bs = ByteStream(bs);
 
@@ -225,7 +229,6 @@ impl<'a> GroupTable<'a> {
     }
 }
 
-const GROUP_KIND_NO_VALUE: u8 = 0;
 const GROUP_KIND_USE_PREV_VALUE: u8 = 1;
 
 #[derive(Debug)]

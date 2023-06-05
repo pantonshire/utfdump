@@ -112,6 +112,39 @@ impl<'a> CharData<'a> {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct CombiningClass(pub u8);
 
+impl CombiningClass {
+    pub fn name(self) -> Option<&'static str> {
+        match self.0 {
+            0 => Some("Not_Reordered"),
+            1 => Some("Overlay"),
+            6 => Some("Han_Reading"),
+            7 => Some("Nukta"),
+            8 => Some("Kana_Voicing"),
+            9 => Some("Virama"),
+            200 => Some("Attached_Below_Left"),
+            202 => Some("Attached_Below"),
+            214 => Some("Attached_Above"),
+            216 => Some("Attached_Above_Right"),
+            218 => Some("Below_Left"),
+            220 => Some("Below"),
+            222 => Some("Below_Right"),
+            224 => Some("Left"),
+            226 => Some("Right"),
+            228 => Some("Above_Left"),
+            230 => Some("Above"),
+            232 => Some("Above_Right"),
+            233 => Some("Double_Below"),
+            234 => Some("Double_Above"),
+            240 => Some("Iota_Subscript"),
+            _ => None,
+        }
+    }
+
+    pub fn is_combining(self) -> bool {
+        self.0 != 0
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Category {
     Lu,
@@ -182,6 +215,76 @@ impl Category {
             _ => None,
         }
     }
+
+    pub fn abbreviation(self) -> &'static str {
+        match self {
+            Self::Lu => "Lu",
+            Self::Ll => "Ll",
+            Self::Lt => "Lt",
+            Self::Mn => "Mn",
+            Self::Mc => "Mc",
+            Self::Me => "Me",
+            Self::Nd => "Nd",
+            Self::Nl => "Nl",
+            Self::No => "No",
+            Self::Zs => "Zs",
+            Self::Zl => "Zl",
+            Self::Zp => "Zp",
+            Self::Cc => "Cc",
+            Self::Cf => "Cf",
+            Self::Cs => "Cs",
+            Self::Co => "Co",
+            Self::Cn => "Cn",
+            Self::Lm => "Lm",
+            Self::Lo => "Lo",
+            Self::Pc => "Pc",
+            Self::Pd => "Pd",
+            Self::Ps => "Ps",
+            Self::Pe => "Pe",
+            Self::Pi => "Pi",
+            Self::Pf => "Pf",
+            Self::Po => "Po",
+            Self::Sm => "Sm",
+            Self::Sc => "Sc",
+            Self::Sk => "Sk",
+            Self::So => "So",
+        }
+    }
+
+    pub fn full_name(self) -> &'static str {
+        match self {
+            Self::Lu => "Letter, Uppercase",
+            Self::Ll => "Letter, Lowercase",
+            Self::Lt => "Letter, Titlecase",
+            Self::Mn => "Mark, Non-Spacing",
+            Self::Mc => "Mark, Spacing Combining",
+            Self::Me => "Mark, Enclosing",
+            Self::Nd => "Number, Decimal Digit",
+            Self::Nl => "Number, Letter",
+            Self::No => "Number, Other",
+            Self::Zs => "Separator, Space",
+            Self::Zl => "Separator, Line",
+            Self::Zp => "Separator: Paragraph",
+            Self::Cc => "Other, Control",
+            Self::Cf => "Other, Format",
+            Self::Cs => "Other, Surrogate",
+            Self::Co => "Other, Private Use",
+            Self::Cn => "Other, Not Assigned",
+            Self::Lm => "Letter, Modifier",
+            Self::Lo => "Letter, Other",
+            Self::Pc => "Punctuation, Connector",
+            Self::Pd => "Punctuation, Dash",
+            Self::Ps => "Punctuation, Open",
+            Self::Pe => "Punctuation, Close",
+            Self::Pi => "Punctuation, Initial Quote",
+            Self::Pf => "Punctuation, Final Quote",
+            Self::Po => "Punctuation, Other",
+            Self::Sm => "Symbol, Math",
+            Self::Sc => "Symbol, Currency",
+            Self::Sk => "Symbol, Modifier",
+            Self::So => "Symbol, Other",
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -240,6 +343,62 @@ impl BidiCategory {
             _ => None,
         }
     }
+
+    pub fn abbreviation(self) -> &'static str {
+        match self {
+            Self::L => "L",
+            Self::R => "R",
+            Self::Al => "AL",
+            Self::En => "EN",
+            Self::Es => "ES",
+            Self::Et => "ET",
+            Self::An => "AN",
+            Self::Cs => "CS",
+            Self::Nsm => "NSM",
+            Self::Bn => "BN",
+            Self::B => "B",
+            Self::S => "S",
+            Self::Ws => "WS",
+            Self::On => "ON",
+            Self::Lre => "LRE",
+            Self::Lro => "LRO",
+            Self::Rle => "RLE",
+            Self::Rlo => "RLO",
+            Self::Pdf => "PDF",
+            Self::Lri => "LRI",
+            Self::Rli => "RLI",
+            Self::Fsi => "FSI",
+            Self::Pdi => "PDI",            
+        }
+    }
+
+    pub fn full_name(self) -> &'static str {
+        match self {
+            Self::L => "Left_To_Right",
+            Self::R => "Right_To_Left",
+            Self::Al => "Arabic_Letter",
+            Self::En => "European_Number",
+            Self::Es => "European_Separator",
+            Self::Et => "European_Terminator",
+            Self::An => "Arabic_Number",
+            Self::Cs => "Common_Separator",
+            Self::Nsm => "Nonspacing_Mark",
+            Self::Bn => "Boundary_Neutral",
+            Self::B => "Paragraph_Separator",
+            Self::S => "Segment_Separator",
+            Self::Ws => "White_Space",
+            Self::On => "Other_Neutral",
+            Self::Lre => "Left_To_Right_Embedding",
+            Self::Lro => "Left_To_Right_Override",
+            Self::Rle => "Right_To_Left_Embedding",
+            Self::Rlo => "Right_To_Left_Override",
+            Self::Pdf => "Pop_Directional_Format",
+            Self::Lri => "Left_To_Right_Isolate",
+            Self::Rli => "Right_To_Left_Isolate",
+            Self::Fsi => "First_Strong_Isolate",
+            Self::Pdi => "Pop_Directional_Isolate",
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -284,6 +443,29 @@ pub enum DecompKind {
     Medial,
     Small,
     Narrow,
+}
+
+impl DecompKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Nobreak => "noBreak",
+            Self::Compat => "compat",
+            Self::Super => "super",
+            Self::Fraction => "fraction",
+            Self::Sub => "sub",
+            Self::Font => "font",
+            Self::Circle => "circle",
+            Self::Wide => "wide",
+            Self::Vertical => "vertical",
+            Self::Square => "square",
+            Self::Isolated => "isolated",
+            Self::Final => "final",
+            Self::Initial => "initial",
+            Self::Medial => "medial",
+            Self::Small => "small",
+            Self::Narrow => "narrow",            
+        }
+    }
 }
 
 pub(crate) enum OptionalDecompKind {

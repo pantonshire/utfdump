@@ -3,7 +3,7 @@ use std::{fmt, io::{self, Read}};
 use clap::Parser;
 use libshire::strings::CappedString;
 use tabled::{Tabled, Table, Style};
-use utfdump::{char_data, CombiningClass, Category, utf8::{Utf8Decode, Utf8Error}};
+use utfdump::{CombiningClass, Category, utf8::{Utf8Decode, Utf8Error}, StaticUnicodeData};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -14,6 +14,8 @@ struct Args {
 }
 
 fn main() {
+    let unicode_data = StaticUnicodeData::new().unwrap();
+
     let args = Args::parse();
 
     let input = {
@@ -27,7 +29,7 @@ fn main() {
 
     let rows = input
         .decode_utf8()
-        .map(|c| OutRow::from_char_result(c, args.full_category_names));
+        .map(|c| OutRow::from_char_result(&unicode_data, c, args.full_category_names));
 
     let table = Table::new(rows)
         .with(Style::modern());
@@ -48,25 +50,35 @@ struct OutRow {
     #[tabled(rename = "Category")]
     category: Optional<DisplayCategory>,
     #[tabled(rename = "Combining")]
-    char_combining_class: Optional<CombiningClass>,
+    char_combining_class: Optional<DisplayCombiningClass>,
 }
 
 impl OutRow {
-    fn from_char_result(c: Result<char, Utf8Error>, full_category_names: bool) -> Self {
+    fn from_char_result(
+        unicode_data: &StaticUnicodeData,
+        c: Result<char, Utf8Error>,
+        full_category_names: bool
+    ) -> Self
+    {
         match c {
-            Ok(c) => Self::from_good_char(c, full_category_names),
+            Ok(c) => Self::from_good_char(unicode_data, c, full_category_names),
             Err(err) => Self::from_bad_char(err),
         }
     }
 
-    fn from_good_char(c: char, full_category_names: bool) -> Self {
+    fn from_good_char(
+        unicode_data: &StaticUnicodeData,
+        c: char,
+        full_category_names: bool
+    ) -> Self
+    {
         let mut name = Optional::None;
         let mut category = Optional::None;
         let mut char_combining_class = Optional::None;
         
         let mut combining = false;
 
-        if let Some(char_data) = char_data(c) {
+        if let Some(char_data) = unicode_data.get(u32::from(c)) {
             name = Optional::Some(char_data.name());
             category = Optional::Some(DisplayCategory {
                 category: char_data.category(),
@@ -74,7 +86,7 @@ impl OutRow {
             });
 
             let ccc = char_data.combining_class();
-            char_combining_class = Optional::Some(ccc);
+            char_combining_class = Optional::Some(DisplayCombiningClass { ccc });
             combining = ccc.is_combining();
         }
 
@@ -184,8 +196,20 @@ impl fmt::Display for DisplayCategory {
         if self.full_name {
             write!(f, "{}", self.category.full_name())
         } else {
-            write!(f, "{}", self.category.abbr())
+            write!(f, "{}", self.category.abbreviation())
         }
     }
 }
 
+struct DisplayCombiningClass {
+    ccc: CombiningClass,
+}
+
+impl fmt::Display for DisplayCombiningClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.ccc.name() {
+            Some(name) => write!(f, "{}", name),
+            None => write!(f, "{}", self.ccc.0),
+        }
+    }
+}
