@@ -9,5 +9,5 @@ members = [
 panic = "abort"
 lto = "fat"
 
-[profile.release.package.wasm]
+[profile.release.package.utfdump_wasm]
 opt-level = "z"
