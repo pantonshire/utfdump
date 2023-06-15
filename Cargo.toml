@@ -2,4 +2,12 @@
 members = [
     "lib",
     "bin",
+    "wasm",
 ]
+
+[profile.release]
+panic = "abort"
+lto = "fat"
+
+[profile.release.package.wasm]
+opt-level = "z"

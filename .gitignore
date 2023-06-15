@@ -1,5 +1,4 @@
 /target
-/build
-/build.sh
+pkg/
 __pycache__
 unicode_data_latest.txt
