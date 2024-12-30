@@ -164,7 +164,6 @@ where
             codepoint |= u32::from(byte & 0x3f) << (6 * (bytes_needed - i - 1));
         }
 
-        // FIXME: make this unchecked?
         let codepoint = char::try_from(codepoint)
             .unwrap();
 
@@ -191,53 +190,71 @@ impl Utf8Error {
 
 #[cfg(test)]
 mod tests {
-    use core::char::REPLACEMENT_CHARACTER;
-
     use super::Utf8Decode;
+
+    #[derive(PartialEq, Eq, Debug)]
+    struct Invalid;
+
+    const INVALID: Result<char, Invalid> = Err(Invalid);
 
     #[test]
     fn test_utf8_decoder() {
         assert_decodes_to(&[
             0x68, 0x65, 0x6c, 0x6c, 0x6f
-        ], "hello");
+        ], &[
+            Ok('h'), Ok('e'), Ok('l'), Ok('l'), Ok('o')
+        ]);
     
         assert_decodes_to(&[
             0xce, 0xba, 0xe1, 0xbd, 0xb9, 0xcf, 0x83, 0xce, 0xbc, 0xce, 0xb5
-        ], "κόσμε");
+        ], &[
+            Ok('κ'), Ok('ό'), Ok('σ'), Ok('μ'), Ok('ε')
+        ]);
 
         assert_decodes_to(&[
             0xf0, 0x9f, 0x8f, 0xb3, 0xef, 0xb8, 0x8f, 0xe2, 0x80, 0x8d, 0xe2, 0x9a, 0xa7, 0xef,
             0xb8, 0x8f
-        ], "\u{1f3f3}\u{fe0f}\u{200d}\u{26a7}\u{fe0f}");
+        ], &[
+            Ok('\u{1f3f3}'), Ok('\u{fe0f}'), Ok('\u{200d}'), Ok('\u{26a7}'), Ok('\u{fe0f}')
+        ]);
 
         assert_decodes_to(&[
             0xce, 0x61
-        ], "\u{fffd}a");
+        ], &[
+            INVALID, Ok('a')
+        ]);
 
         assert_decodes_to(&[
             0xce, 0xc2
-        ], "\u{fffd}\u{fffd}");
+        ], &[
+            INVALID, INVALID
+        ]);
 
         assert_decodes_to(&[
             0x80
-        ], "\u{fffd}");
+        ], &[
+            INVALID
+        ]);
 
         assert_decodes_to(&[
             0x80, 0x80
-        ], "\u{fffd}\u{fffd}");
+        ], &[
+            INVALID, INVALID
+        ]);
+
+        assert_decodes_to(&[
+            0xed, 0x86, 0xad, 0xed, 0xba, 0xad
+        ], &[
+            Ok('\u{d1ad}'), INVALID, INVALID, INVALID
+        ]);
     }
 
-    fn assert_decodes_to(bytes: &[u8], expected: &str) {
+    fn assert_decodes_to(bytes: &[u8], expected: &[Result<char, Invalid>]) {
         let mut decoded = bytes.decode_utf8();
 
-        for expected_char in expected.chars() {
-            let decoded_char = match decoded.next() {
-                Some(Ok(c)) => Some(c),
-                Some(Err(_)) => Some(REPLACEMENT_CHARACTER),
-                None => None,
-            };
-
-            assert_eq!(decoded_char, Some(expected_char));
+        for expected_char in expected {
+            let decoded_char = decoded.next().map(|res| res.map_err(|_| Invalid));
+            assert_eq!(decoded_char.as_ref(), Some(expected_char));
         }
 
         assert!(decoded.next().is_none());
